@@ -1,0 +1,9 @@
+{
+  "current_user": "Zenyth0201",
+  "users": [
+    "Zenyth02012"
+  ],
+  "poll_interval": 1,
+  "max_wait": 180,
+  "skip_login": true
+}
