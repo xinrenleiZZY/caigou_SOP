@@ -1,5 +1,5 @@
 """
-HZX-采购数据管家 V1.0.0
+HZX-采购数据管家 V2.0.0
 主应用窗口 - PYQT5 + qfluentwidgets (Fluent Design 精致版)
 """
 import sys, os, json, threading, shutil, time, smtplib, email
@@ -13,11 +13,11 @@ from qfluentwidgets import (
     LineEdit, TextEdit, InfoBar, InfoBarPosition, IndeterminateProgressRing,
     setTheme, Theme, ComboBox, BodyLabel, TitleLabel,
     CaptionLabel, StrongBodyLabel, SpinBox, ScrollArea,
-    setThemeColor,
+    setThemeColor, SwitchButton,
 )
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import APP_NAME, VERSION, DEVELOPER, PHONE, SOP_DOCS_DIR, FILE_LIST_PATH
+from config import APP_NAME, VERSION, DEVELOPER, PHONE, SOP_DOCS_DIR, FILE_LIST_PATH, load_settings, save_settings
 from main_processing import run_processing
 
 # ========== 信号基类 ==========
@@ -79,19 +79,33 @@ class EmailWorker(QThread):
 
 # ========== 主窗口 ==========
 class MainWindow(FluentWindow):
-
     def __init__(self):
         super().__init__()
+        self.settings = load_settings()
+
+        # 应用保存的主题
+        is_dark = self.settings.get("theme", "light") == "dark"
+        if is_dark:
+            setTheme(Theme.DARK)
+        else:
+            setTheme(Theme.LIGHT)
+        setThemeColor("#0078D4")
+
+        # 设置右侧内容区背景色（修复深色模式白色背景问题）
+        from PyQt5.QtGui import QColor
+        self.setCustomBackgroundColor(
+            QColor(243, 243, 243),   # 浅色模式背景
+            QColor(28, 28, 28)       # 深色模式背景
+        )
+
         self.setWindowTitle(f"{APP_NAME} {VERSION}")
         self.resize(1200, 800)
-        setTheme(Theme.LIGHT)
-        setThemeColor("#0078D4")
         os.makedirs(SOP_DOCS_DIR, exist_ok=True)
         self.file_list = self.load_file_list()
         self.current_source_file = ""
         self.current_output_file = ""
-        self.year1_val = 25
-        self.year2_val = 26
+        self.year1_val = self.settings.get("year1", 25)
+        self.year2_val = self.settings.get("year2", 26)
 
         # 创建页面
         self.home_page = HomePage(self)
@@ -113,36 +127,44 @@ class MainWindow(FluentWindow):
         self.tutorial_page.setObjectName("tutorial")
         self.version_page.setObjectName("versionInfo")
 
+        # 所有页面容器设置透明背景，适配深色模式
+        transparent_style = "QWidget{background:transparent;} QScrollArea{background:transparent;}"
+        for page in [self.home_page, self.sop_page, self.file_list_page, self.log_page,
+                     self.settings_page, self.email_page, self.tutorial_page, self.version_page]:
+            page.setStyleSheet(transparent_style)
+            if hasattr(page, 'viewport'):
+                page.viewport().setStyleSheet("background:transparent;")
+
         ni = self.navigationInterface
 
         # ===== 首页（仪表盘）=====
-        self.addSubInterface(self.home_page, FIC.HOME, "首页")
+        self.addSubInterface(self.home_page, FIC.HOME, "首页", isTransparent=True)
 
         # ===== 工具管理组（可展开，后续扩展）=====
         from PyQt5.QtWidgets import QFrame, QVBoxLayout
-        self._tools_group = QFrame(); self._tools_group.setObjectName("toolsGroup")
+        self._tools_group = QFrame(); self._tools_group.setObjectName("toolsGroup"); self._tools_group.setStyleSheet("background:transparent;")
         gl = QVBoxLayout(self._tools_group)
         gl.addWidget(TitleLabel("工具管理")); gl.addWidget(BodyLabel("选择下方功能"))
-        self.addSubInterface(self._tools_group, FIC.DEVELOPER_TOOLS, "工具管理", NavigationItemPosition.SCROLL)
+        self.addSubInterface(self._tools_group, FIC.DEVELOPER_TOOLS, "工具管理", NavigationItemPosition.SCROLL, isTransparent=True)
 
         self.addSubInterface(self.sop_page, FIC.ALBUM, "月度数据对比SOP",
-                             NavigationItemPosition.SCROLL, parent=self._tools_group)
+                             NavigationItemPosition.SCROLL, parent=self._tools_group, isTransparent=True)
 
         # ===== 主功能（一级导航）=====
-        self.addSubInterface(self.file_list_page, FIC.DOCUMENT, "文件列表", NavigationItemPosition.SCROLL)
-        self.addSubInterface(self.log_page, FIC.LIBRARY, "处理日志", NavigationItemPosition.SCROLL)
-        self.addSubInterface(self.settings_page, FIC.SETTING, "设置", NavigationItemPosition.SCROLL)
-        self.addSubInterface(self.email_page, FIC.MAIL, "邮箱反馈", NavigationItemPosition.SCROLL)
+        self.addSubInterface(self.file_list_page, FIC.DOCUMENT, "文件列表", NavigationItemPosition.SCROLL, isTransparent=True)
+        self.addSubInterface(self.log_page, FIC.LIBRARY, "处理日志", NavigationItemPosition.SCROLL, isTransparent=True)
+        self.addSubInterface(self.settings_page, FIC.SETTING, "设置", NavigationItemPosition.SCROLL, isTransparent=True)
+        self.addSubInterface(self.email_page, FIC.MAIL, "邮箱反馈", NavigationItemPosition.SCROLL, isTransparent=True)
 
         # ===== 帮助组 =====
-        self._help_group = QFrame(); self._help_group.setObjectName("helpGroup")
+        self._help_group = QFrame(); self._help_group.setObjectName("helpGroup"); self._help_group.setStyleSheet("background:transparent;")
         gl2 = QVBoxLayout(self._help_group)
         gl2.addWidget(TitleLabel("帮助")); gl2.addWidget(BodyLabel("选择下方功能"))
-        self.addSubInterface(self._help_group, FIC.HELP, "帮助", NavigationItemPosition.SCROLL)
+        self.addSubInterface(self._help_group, FIC.HELP, "帮助", NavigationItemPosition.SCROLL, isTransparent=True)
         self.addSubInterface(self.tutorial_page, FIC.EDUCATION, "使用教程",
-                             NavigationItemPosition.SCROLL, parent=self._help_group)
+                             NavigationItemPosition.SCROLL, parent=self._help_group, isTransparent=True)
         self.addSubInterface(self.version_page, FIC.INFO, "版本信息",
-                             NavigationItemPosition.SCROLL, parent=self._help_group)
+                             NavigationItemPosition.SCROLL, parent=self._help_group, isTransparent=True)
 
         # 底部
         ni.addSeparator()
@@ -169,7 +191,7 @@ class HomePage(ScrollArea):
     def __init__(self, parent: MainWindow):
         super().__init__(); self.main = parent; self.setObjectName("homePage"); self._setup_ui()
     def _setup_ui(self):
-        widget = QWidget(); layout = QVBoxLayout(widget); layout.setSpacing(16); layout.setContentsMargins(32, 24, 32, 24)
+        widget = QWidget(); widget.setStyleSheet("background:transparent;"); layout = QVBoxLayout(widget); layout.setSpacing(16); layout.setContentsMargins(32, 24, 32, 24)
         layout.addWidget(TitleLabel(f"欢迎使用 {APP_NAME}"))
         layout.addWidget(CaptionLabel(f"版本 {VERSION} | 开发人: {DEVELOPER} | 电话: {PHONE}"))
         layout.addSpacing(8)
@@ -228,7 +250,7 @@ class SOPPage(ScrollArea):
         if hasattr(self.main, 'log_page') and self.main.log_page:
             self.main.log_page.add_log(msg)
     def _setup_ui(self):
-        widget = QWidget(); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 20, 32, 20)
+        widget = QWidget(); widget.setStyleSheet("background:transparent;"); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 20, 32, 20)
         layout.addWidget(TitleLabel("月度采购数据对比SOP"))
         layout.addWidget(CaptionLabel("上传源文件，一键完成全部数据处理任务"))
         layout.addSpacing(4)
@@ -365,7 +387,7 @@ class LogPage(ScrollArea):
     def __init__(self, parent: MainWindow):
         super().__init__(); self.main = parent; self.setObjectName("logPage"); self._setup_ui()
     def _setup_ui(self):
-        widget = QWidget(); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
+        widget = QWidget(); widget.setStyleSheet("background:transparent;"); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
         layout.addWidget(TitleLabel("处理日志")); layout.addSpacing(4)
         card = SimpleCardWidget(); card.setBorderRadius(12)
         cl = QVBoxLayout(card); cl.setContentsMargins(20, 14, 20, 14)
@@ -387,7 +409,7 @@ class FileListPage(ScrollArea):
     def __init__(self, parent: MainWindow):
         super().__init__(); self.main = parent; self.setObjectName("fileListPage"); self._setup_ui()
     def _setup_ui(self):
-        widget = QWidget(); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
+        widget = QWidget(); widget.setStyleSheet("background:transparent;"); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
         layout.addWidget(TitleLabel("文件列表")); layout.addSpacing(4)
         card1 = SimpleCardWidget(); card1.setBorderRadius(12)
         c1 = QVBoxLayout(card1); c1.setContentsMargins(24, 16, 24, 16)
@@ -436,19 +458,63 @@ class SettingsPage(ScrollArea):
     def __init__(self, parent: MainWindow):
         super().__init__(); self.main = parent; self.setObjectName("settingsPage"); self._setup_ui()
     def _setup_ui(self):
-        widget = QWidget(); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
+        widget = QWidget(); widget.setStyleSheet("background:transparent;"); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
         layout.addWidget(TitleLabel("设置")); layout.addSpacing(4)
+
+        # 外观
+        card_theme = SimpleCardWidget(); card_theme.setBorderRadius(12)
+        ct = QVBoxLayout(card_theme); ct.setContentsMargins(24, 16, 24, 16)
+        ct.addWidget(StrongBodyLabel("外观"))
+        tr = QHBoxLayout(); tr.addWidget(BodyLabel("深色模式"))
+        self.theme_switch = SwitchButton()
+        self.theme_switch.setChecked(self.main.settings.get("theme", "light") == "dark")
+        self.theme_switch.checkedChanged.connect(self._on_theme)
+        tr.addWidget(self.theme_switch); tr.addStretch(); ct.addLayout(tr)
+        layout.addWidget(card_theme)
+
+        # 应用信息
         card1 = SimpleCardWidget(); card1.setBorderRadius(12)
         c1 = QVBoxLayout(card1); c1.setContentsMargins(24, 16, 24, 16)
         c1.addWidget(StrongBodyLabel("应用信息"))
         for k,v in [("应用名称", APP_NAME),("版本", VERSION),("开发人", DEVELOPER),("联系电话", PHONE)]:
             r = QHBoxLayout(); r.addWidget(BodyLabel(f"{k}:")); lbl = BodyLabel(v); lbl.setStyleSheet("color:#666;"); r.addWidget(lbl); r.addStretch(); c1.addLayout(r)
         layout.addWidget(card1)
+
+        # 处理参数
+        card2 = SimpleCardWidget(); card2.setBorderRadius(12)
+        c2 = QVBoxLayout(card2); c2.setContentsMargins(24, 16, 24, 16)
+        c2.addWidget(StrongBodyLabel("处理参数"))
+        pr = QHBoxLayout()
+        pr.addWidget(BodyLabel("年份1:"))
+        self.set_year1 = SpinBox(); self.set_year1.setValue(self.main.year1_val); self.set_year1.setRange(20, 99)
+        pr.addWidget(self.set_year1); pr.addSpacing(30)
+        pr.addWidget(BodyLabel("年份2:"))
+        self.set_year2 = SpinBox(); self.set_year2.setValue(self.main.year2_val); self.set_year2.setRange(20, 99)
+        pr.addWidget(self.set_year2); pr.addStretch()
+        c2.addLayout(pr)
+        btn_save = PrimaryPushButton("保存参数")
+        btn_save.clicked.connect(self._save_params)
+        c2.addWidget(btn_save)
+        layout.addWidget(card2)
+
+        # 关于
         card3 = SimpleCardWidget(); card3.setBorderRadius(12)
         c3 = QVBoxLayout(card3); c3.setContentsMargins(24, 16, 24, 16)
-        c3.addWidget(StrongBodyLabel("关于")); c3.addWidget(BodyLabel(f"{APP_NAME} {VERSION} - 专为采购数据月度对比SOP设计"))
+        c3.addWidget(StrongBodyLabel("关于"))
+        c3.addWidget(BodyLabel(f"{APP_NAME} {VERSION} - 专为采购数据月度对比SOP设计"))
         l = BodyLabel(f"开发人: {DEVELOPER} | 联系电话: {PHONE}"); l.setStyleSheet("color:#888;"); c3.addWidget(l)
         layout.addWidget(card3); layout.addStretch(); self.setWidget(widget); self.setWidgetResizable(True)
+
+    def _on_theme(self, is_dark):
+        setTheme(Theme.DARK if is_dark else Theme.LIGHT)
+        self.main.settings["theme"] = "dark" if is_dark else "light"
+        save_settings(self.main.settings)
+
+    def _save_params(self):
+        self.main.year1_val = self.set_year1.value(); self.main.year2_val = self.set_year2.value()
+        self.main.settings["year1"] = self.main.year1_val; self.main.settings["year2"] = self.main.year2_val
+        save_settings(self.main.settings)
+        InfoBar.success("已保存", "参数配置已保存", orient=Qt.Horizontal, isClosable=True, position=InfoBarPosition.TOP, parent=self)
 
 
 # ========== 邮箱反馈 ==========
@@ -456,7 +522,7 @@ class EmailPage(ScrollArea):
     def __init__(self, parent: MainWindow):
         super().__init__(); self.main = parent; self.setObjectName("emailPage"); self._setup_ui()
     def _setup_ui(self):
-        widget = QWidget(); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
+        widget = QWidget(); widget.setStyleSheet("background:transparent;"); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
         layout.addWidget(TitleLabel("邮箱反馈")); layout.addSpacing(4)
         card = SimpleCardWidget(); card.setBorderRadius(12)
         cl = QVBoxLayout(card); cl.setContentsMargins(24, 16, 24, 16)
@@ -502,7 +568,7 @@ class TutorialPage(ScrollArea):
     def __init__(self, parent: MainWindow):
         super().__init__(); self.main = parent; self.setObjectName("tutorialPage"); self._setup_ui()
     def _setup_ui(self):
-        widget = QWidget(); layout = QVBoxLayout(widget); layout.setSpacing(10); layout.setContentsMargins(32, 24, 32, 24)
+        widget = QWidget(); widget.setStyleSheet("background:transparent;"); layout = QVBoxLayout(widget); layout.setSpacing(10); layout.setContentsMargins(32, 24, 32, 24)
         layout.addWidget(TitleLabel("使用教程")); layout.addSpacing(4)
         steps = [("① 上传文件", "点击「浏览文件」选择Excel文件，或从下拉列表选最近使用的。"),
                  ("② 设置参数", "确认年份1/年份2，默认为25/26。"),
@@ -521,7 +587,7 @@ class VersionPage(ScrollArea):
     def __init__(self, parent: MainWindow):
         super().__init__(); self.main = parent; self.setObjectName("versionPage"); self._setup_ui()
     def _setup_ui(self):
-        widget = QWidget(); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
+        widget = QWidget(); widget.setStyleSheet("background:transparent;"); layout = QVBoxLayout(widget); layout.setSpacing(12); layout.setContentsMargins(32, 24, 32, 24)
         layout.addWidget(TitleLabel("版本信息")); layout.addSpacing(4)
         card = SimpleCardWidget(); card.setBorderRadius(12)
         cl = QVBoxLayout(card); cl.setContentsMargins(24, 20, 24, 20)

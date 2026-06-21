@@ -1,13 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-HZX-采购数据管家 V1.0.0
+HZX-采购数据管家 V2.0.0
 PyInstaller 打包配置文件
 """
 import os, sys, platform
 
 block_cipher = None
 
-app_dir = os.path.dirname(os.path.abspath(__file__))
+app_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+icon_path = os.path.join(app_dir, 'app_icon.ico')
 
 a = Analysis(
     ['app.py'],
@@ -17,13 +18,13 @@ a = Analysis(
         ('config.py', '.'),
         ('main_processing.py', '.'),
         ('pages\\__init__.py', 'pages'),
+        ('app_icon.ico', '.'),
     ],
     hiddenimports=[
-        # win32com
+        'pypinyin',
         'win32com',
         'win32com.client',
         'win32com.gen_py',
-        # openpyxl
         'openpyxl',
         'openpyxl.cell',
         'openpyxl.styles',
@@ -33,20 +34,17 @@ a = Analysis(
         'openpyxl.writer.excel',
         'openpyxl.reader.excel',
         'openpyxl.formatting',
-        # qfluentwidgets
         'qfluentwidgets',
         'qfluentwidgets.common',
         'qfluentwidgets.common.icon',
         'qfluentwidgets.components',
         'qfluentwidgets.window',
         'qfluentwidgets._rc',
-        # PyQt5
         'PyQt5',
         'PyQt5.QtCore',
         'PyQt5.QtGui',
         'PyQt5.QtWidgets',
         'PyQt5.QtSvg',
-        # darkdetect
         'darkdetect',
     ],
     hookspath=[],
@@ -91,5 +89,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=os.path.join(app_dir, 'app_icon.ico'),
+    icon=icon_path,
 )
