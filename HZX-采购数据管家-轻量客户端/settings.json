@@ -1,0 +1,7 @@
+{
+  "year1": 25,
+  "year2": 26,
+  "enable_border": false,
+  "theme": "light",
+  "api_server": "http://localhost:5000"
+}
