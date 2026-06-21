@@ -7,6 +7,7 @@ from copy import copy
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+import pypinyin
 
 # 修正配置导入
 if getattr(sys, 'frozen', False):
@@ -152,6 +153,16 @@ def adjust_all_formulas(ws, insert_at, count=2):
                     return m.group(0)
                 cell.value = re.sub(r'(\$?[A-Z]+\$?)(\d+)', repl, v)
 
+def _pinyin_key(name):
+    """拼音排序键：(空白) 排最后，中文按拼音排序"""
+    if name == '(空白)':
+        return (1, '')
+    try:
+        py = ''.join(pypinyin.lazy_pinyin(name))
+        return (0, py)
+    except:
+        return (0, name)
+
 def build_amazon_hierarchy(ws, max_row):
     rows = []
     for r in range(2, max_row + 1):
@@ -185,7 +196,7 @@ def build_amazon_hierarchy(ws, max_row):
         for row in ch_rows:
             rm_key = row['reason_m'] if row['reason_m'] else '(空白)'
             rms.setdefault(rm_key, []).append(row)
-        for rm_name, rm_rows in sorted(rms.items()):
+        for rm_name, rm_rows in sorted(rms.items(), key=lambda x: _pinyin_key(x[0])):
             rm_qty = sum(r['qty'] for r in rm_rows)
             rm_amt = sum(r['amt'] for r in rm_rows)
             result.append({'level': 'reason_m', 'channel': '', 'reason_m': rm_name,
@@ -195,7 +206,7 @@ def build_amazon_hierarchy(ws, max_row):
             for row in rm_rows:
                 rn_key = row['reason_n'] if row['reason_n'] else '(空白)'
                 rns.setdefault(rn_key, []).append(row)
-            for rn_name, rn_rows in sorted(rns.items()):
+            for rn_name, rn_rows in sorted(rns.items(), reverse=True):
                 rn_qty = sum(r['qty'] for r in rn_rows)
                 rn_amt = sum(r['amt'] for r in rn_rows)
                 result.append({'level': 'reason_n', 'channel': '', 'reason_m': '',
@@ -205,7 +216,7 @@ def build_amazon_hierarchy(ws, max_row):
                 for row in rn_rows:
                     ro_key = row['reason_o'] if row['reason_o'] else '(空白)'
                     ros.setdefault(ro_key, []).append(row)
-                for ro_name, ro_rows in sorted(ros.items()):
+                for ro_name, ro_rows in sorted(ros.items(), reverse=True):
                     ro_qty = sum(r['qty'] for r in ro_rows)
                     ro_amt = sum(r['amt'] for r in ro_rows)
                     result.append({'level': 'reason_o', 'channel': '', 'reason_m': '',
@@ -215,7 +226,7 @@ def build_amazon_hierarchy(ws, max_row):
                     for row in ro_rows:
                         cs_key = row['customs'] if row['customs'] else '(空白)'
                         cs_map.setdefault(cs_key, []).append(row)
-                    for cs_name, cs_rows in sorted(cs_map.items()):
+                    for cs_name, cs_rows in sorted(cs_map.items(), reverse=True):
                         cs_qty = sum(r['qty'] for r in cs_rows)
                         cs_amt = sum(r['amt'] for r in cs_rows)
                         result.append({'level': 'customs', 'channel': '', 'reason_m': '',
